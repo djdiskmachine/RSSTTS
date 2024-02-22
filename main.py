@@ -2,7 +2,7 @@ import os, subprocess, feedparser, time, re
 from pydub import AudioSegment
 
 TIMEOUT = 300
-PIPER_MODEL = "en_GB-alba-medium"
+PIPER_MODEL = "./en_GB-alba-medium.onnx"
 RSS_FEED_URL = "https://pluralistic.net/feed/"
 REGEX_HYPERLINK = r'https?://(www.)?[-a-zA-Z0-9@:%.+~#=]{1,256}.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()!@:%+.~#?&//=]*)'
 
@@ -28,7 +28,7 @@ def process_entries(entries):
         name_wav = name_txt[:-4] + ".wav"
         name_mp3 = name_txt[:-4] + ".mp3"
         if os.path.exists(name_mp3):# or os.path.exists(name_txt):
-            print(f"File '{name_txt}' already processed, continuing")
+            print(f"File '{name_txt[4:]}' already processed, continuing")
             continue
 
         summary = clean_up_summary(entry.summary)
@@ -37,8 +37,15 @@ def process_entries(entries):
 
         with open(name_txt, 'r') as file_txt:
             p1 = subprocess.Popen(["cat"], stdin=file_txt, stdout=subprocess.PIPE)
-            p2 = subprocess.Popen(["piper", "-m", PIPER_MODEL, "--output_file", name_wav], stdin=p1.stdout, stdout=subprocess.PIPE)
+            model_path = ""
+            if os.path.exists(PIPER_MODEL):
+                model_path = PIPER_MODEL
+            else:
+                model_path = PIPER_MODEL[2:-5]
+                print(f"{PIPER_MODEL} not found, downloading")
+            p2 = subprocess.Popen(["piper", "-m", model_path, "--output_file", name_wav], stdin=p1.stdout, stdout=subprocess.PIPE)
             p1.stdout.close()  # Allow p1 to receive a SIGPIPE if p2 exits.
+            print(f"Processing {name_wav[4:]}")
             p2.communicate()[0]
 
         input_wav = AudioSegment.from_file(name_wav)
@@ -56,7 +63,7 @@ def main():
         except Exception as e:
             print("An error occurred:", e)
 
-        # Fetch the feed every 5 minutes
+        print(f"Wait {TIMEOUT} seconds before refreshing")
         time.sleep(TIMEOUT)
 
 if __name__ == "__main__":
